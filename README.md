@@ -4,7 +4,10 @@ A lightweight, interactive web dashboard to map and track Elden Ring's complex w
 
 Elden Ring's questlines are notoriously tangled. This tool visualizes the progression of every major and minor NPC, allowing you to filter by specific characters, view exact locations, and—most importantly—see exactly what actions will permanently break a questline.
 
+<img width="1424" height="759" alt="Captura de pantalla 2026-03-19 a la(s) 2 29 56 p m" src="https://github.com/user-attachments/assets/2dfa2050-3fad-4ede-be56-903fdb2b6bb2" />
+
 ## ✨ Features
+
 
 * **Interactive Network Graph:** Visually trace the chronological flow of quests and how they intersect with major story triggers.
 * **Granular Quest Filtering:** Isolate specific groups (e.g., "Magic Tutors" or "Volcano Manor") to remove the noise and focus on your current run.
