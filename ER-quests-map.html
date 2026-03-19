@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Elden Ring Ultimate Quest Tracker</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: #f8fafc; }
+        #network-container { width: 100%; height: 100%; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .vis-network { outline: none; }
+    </style>
+</head>
+<body class="flex h-screen font-sans antialiased">
+
+    <div class="w-1/3 bg-slate-900 border-r border-slate-700 flex flex-col shadow-xl z-10">
+        <div class="p-6 border-b border-slate-700 bg-slate-800">
+            <h1 class="text-2xl font-bold text-amber-500 mb-2">ER: Ultimate Questline Map</h1>
+            <p class="text-sm text-slate-300 mb-4">Select a questline group below, or click any node on the right for comprehensive, spoiler-heavy details.</p>
+            
+            <label for="quest-filter" class="block text-sm font-medium text-slate-400 mb-1">Focus Group:</label>
+            <select id="quest-filter" class="w-full bg-slate-700 text-white border border-slate-600 rounded p-2 focus:ring-amber-500 outline-none transition">
+                <option value="all">Show All (Zoom out!)</option>
+                <option value="main">Main Progression & Triggers</option>
+                <option value="ranni">Ranni the Witch (Age of Stars)</option>
+                <option value="fia">Fia, D, & Rogier (Duskborn)</option>
+                <option value="volcano">Volcano Manor, Rya, Bernahl</option>
+                <option value="millicent">Millicent & Gowry</option>
+                <option value="nepheli">Nepheli, Kenneth, Gostoc</option>
+                <option value="order">Corhyn & Goldmask (Order)</option>
+                <option value="dung">Dung Eater & Boggart (Despair)</option>
+                <option value="frenzy">Hyetta, Irina, Edgar (Frenzy)</option>
+                <option value="magic">Sellen & Thops (Magic Tutors)</option>
+                <option value="hunters">Varré & Yura (Blood & Hunters)</option>
+                <option value="companions">Alexander, Diallos, Jar Bairn, Boc</option>
+            </select>
+        </div>
+
+        <div id="details-panel" class="p-6 flex-1 overflow-y-auto">
+            <div class="flex items-center justify-center h-full text-slate-500 text-center italic">
+                Select a node on the graph to view exact locations, Sites of Grace, and lockouts.
+            </div>
+        </div>
+    </div>
+
+    <div class="w-2/3 relative bg-slate-950">
+        <div id="network-container"></div>
+    </div>
+
+    <script type="text/javascript">
+        // --- 1. Comprehensive Quest Data ---
+        const questData = {
+            // Main & Triggers
+            1: { title: "Start: Limgrave", location: "The First Step", action: "Begin your journey. Speak to Varré. Rest at Gatefront to get Torrent from Melina.", warning: "Killing any non-hostile NPC immediately breaks their questline." },
+            5: { title: "TRIGGER: Reach Altus Plateau", location: "Grand Lift of Dectus / Ruin-Strewn Precipice", action: "Entering the Altus region triggers a massive world state shift.", warning: "Moves Corhyn from Roundtable, starts the Radahn Festival, and advances Fia's quest." },
+            6: { title: "TRIGGER: Radahn Festival", location: "Redmane Castle, Caelid", action: "Speak to Jerren to begin the festival. Defeat Starscourge Radahn.", warning: "Required for Ranni, Fia, and Alexander. Skips early dialogue for Blaidd but does not break quests." },
+            10: { title: "TRIGGER: Burn the Erdtree", location: "Forge of the Giants", action: "Defeat the Fire Giant and speak to Melina at the forge.", warning: "🔴 Lockout: This kills Morgott if not done, and locks you out of Corhyn's quest if you haven't completed his Mountaintops step." },
+            11: { title: "CRITICAL: Defeat Maliketh", location: "Crumbling Farum Azula", action: "Defeat Maliketh, the Black Blade.", warning: "🔴 POINT OF NO RETURN. Leyndell becomes the Ashen Capital. Locks out Volcano Manor, Goldmask, early Nepheli, and Dung Eater." },
+            
+            // Ranni
+            20: { title: "Meet Renna & Blaidd", location: "Church of Elleh / Mistwood Ruins", action: "Get the Spirit Bell from Renna at night. Snap your fingers in Mistwood to meet Blaidd and kill Darriwil.", warning: "Missable early on, but does not lock you out of Ranni's main quest later." },
+            21: { title: "Pledge to Ranni", location: "Ranni's Rise, Three Sisters (Liurnia)", action: "Defeat Loretta. Speak to Ranni, Iji, Blaidd, and Seluvis.", warning: "Do not attack her spectral allies." },
+            24: { title: "Fingerslayer Blade", location: "Nokron, Eternal City", action: "Descend the crater in Limgrave after Radahn dies. Get the blade and give it to Ranni.", warning: "🔴 Giving her the blade permanently kills Seluvis. Buy all his spells and puppets first!" },
+            27: { title: "Dark Moon Ring & Astel", location: "Lake of Rot / Grand Cloister", action: "Traverse the Lake of Rot, defeat Astel, and place the Dark Moon Ring on Ranni's finger in the Cathedral of Manus Celes.", warning: "Must have looted the ring from the locked chest in Raya Lucaria." },
+            
+            // Fia & Rogier
+            30: { title: "Rogier's Investigation", location: "Stormveil / Roundtable Hold", action: "Find Rogier's bloodstain beneath Stormveil. Talk to Fia about the Black Knifeprint.", warning: "Talking to Ranni at her Rise before finishing Rogier's investigation will cause Rogier to fall asleep permanently." },
+            35: { title: "Give Cursemark to Fia", location: "Prince of Death's Throne, Deeproot Depths", action: "Let Fia hold you, give her the Cursemark (from Ranni's Divine Tower). Defeat Lichdragon Fortissax.", warning: "If you give D's armor to his brother early, he will murder Fia. You can still get the rune, but her dialogue ends." },
+
+            // Volcano Manor & Rya
+            60: { title: "Rya's Necklace", location: "Boilprawn Shack, Liurnia", action: "Buy Rya's necklace from Blackguard Boggart. This unlocks Boggart's quest and gets you a teleport to the Manor.", warning: "If you kill Boggart, you lose access to Boiled Crab and his Dung Eater interaction." },
+            61: { title: "Join Volcano Manor", location: "Volcano Manor, Mt. Gelmir", action: "Pledge to Tanith. Complete the Limgrave (Istvan) and Liurnia (Rileigh) assassinations.", warning: "Do not kill Rykard yet." },
+            66: { title: "Defeat Rykard", location: "Audience Pathway", action: "Defeat Rykard using the Serpent-Hunter spear.", warning: "🔴 Killing him before completing Juno Hoslow (Mountaintops) and Vargram (Leyndell) fails all remaining hit quests, losing you armor sets." },
+
+            // Millicent
+            71: { title: "Unalloyed Gold Needle", location: "Gowry's Shack, Caelid", action: "Defeat O'Neil, give needle to Gowry, reload, give to Millicent at Church of Plague. Give her the Valkyrie Prosthesis at Erdtree-Gazing Hill.", warning: "Killing Gowry early breaks this." },
+            75: { title: "Assist Millicent", location: "Elphael, Brace of the Haligtree", action: "Defeat the Ulcerated Tree Spirit. Choose the GOLD summon sign to help Millicent fight her sisters.", warning: "Choosing the RED sign kills her, giving a different talisman but locking you out of the Frenzy cure." },
+
+            // Nepheli, Kenneth, Gostoc
+            80: { title: "Clear Fort Haight", location: "Fort Haight, Limgrave", action: "Talk to Kenneth above the Mistwood. Clear his fort. Meet Nepheli in Stormveil and summon her for Godrick.", warning: "Do not kill Gostoc in Stormveil, he is needed for the final reward." },
+            82: { title: "Stormhawk King", location: "Village of the Albinaurics / Roundtable", action: "Find Nepheli depressed at Roundtable. Give her the Stormhawk King ash found in the Four Belfries.", warning: "🔴 DO NOT give her Seluvis's Potion. Give it to Gideon instead." },
+            83: { title: "Throne Room", location: "Godrick's Throne, Stormveil", action: "After defeating Morgott in Leyndell, rest at Godrick's grace. Nepheli, Kenneth, and Gostoc will gather here.", warning: "Requires Morgott to be dead. Grants an Ancient Dragon Smithing Stone." },
+
+            // Corhyn & Goldmask
+            40: { title: "Corhyn's Search", location: "Altus Plateau", action: "Corhyn leaves the Roundtable when you reach Altus. Find him north of the Altus Highway Junction, then introduce him to Goldmask on the great bridge.", warning: "He will die if you burn the Erdtree before advancing him to the Mountaintops." },
+            42: { title: "Law of Regression", location: "Erdtree Sanctuary, Leyndell", action: "Cast 'Law of Regression' (Requires 37 INT) in front of the Radagon statue. Tell Goldmask the secret.", warning: "Must be done BEFORE killing Maliketh." },
+
+            // Dung Eater & Boggart
+            50: { title: "Seedbed Curses", location: "Roundtable Hold / Leyndell", action: "Show Dung Eater a Seedbed Curse. Free his physical body in the Subterranean Shunning-Grounds.", warning: "Boggart must be at the Capital Outskirts moat before you fight Dung Eater there to get Boggart's gear." },
+            
+            // Frenzy (Hyetta & Edgar)
+            90: { title: "Shabriri Grapes", location: "Weeping Peninsula / Liurnia", action: "Complete Irina/Edgar's quest in Castle Morne. Edgar invades at Revenger's Shack. Give his grape (and two others) to Hyetta.", warning: "Hyetta will not appear if Irina's quest is not progressed." },
+            92: { title: "Three Fingers", location: "Frenzied Flame Proscription", action: "Remove your armor to open the door and inherit the flame.", warning: "🔴 Locks you into the Lord of Frenzied Flame ending, voiding all others unless you use Miquella's Needle." },
+
+            // Magic (Sellen & Thops)
+            110: { title: "Academy Glintstone Key", location: "Church of Irith / Raya Lucaria", action: "Give Thops the second Academy Key (found on the chandelier in the Church of the Cuckoo).", warning: "Giving him your only key locks you out of the Academy." },
+            112: { title: "Sellen's Primal Glintstone", location: "Witchbane Ruins / Three Sisters", action: "Find Azur and Lusat. Transplant Sellen's glintstone into a new puppet hidden in Seluvis's secret cellar.", warning: "Assisting Jerren at the end kills Sellen. Assisting Sellen yields two mage armor sets." },
+
+            // Hunters (Varré & Yura)
+            120: { title: "Bloody Finger", location: "Rose Church, Liurnia", action: "Complete Varré's invasions. Soak the Lord of Blood's Favor in maiden blood (Church of Inhibition).", warning: "Unlocks early access to Mohgwyn Palace." },
+            122: { title: "Eleonora", location: "Second Church of Marika, Altus", action: "Assist Yura in Limgrave and Liurnia. Meet his end at the Second Church to fight Eleonora.", warning: "If you meet Shabriri in the Mountaintops before finishing this, Yura's quest abruptly ends." },
+
+            // Companions (Alexander, Diallos, Boc)
+            130: { title: "Boc the Seamster", location: "Limgrave / Leyndell", action: "Give Boc his sewing needle. Later, give him the Gold Sewing Needle.", warning: "🔴 DO NOT give him a Larval Tear when he asks. Use the 'You're Beautiful' Prattling Pate in front of him instead." },
+            132: { title: "Diallos & Jar Bairn", location: "Jarburg, Liurnia", action: "Diallos abandons Volcano Manor and moves to Jarburg to become a potentate.", warning: "Alexander must leave Limgrave, and Diallos must leave the Manor for this to trigger." },
+            134: { title: "Alexander's Duel", location: "Crumbling Farum Azula", action: "Talk to him at Radahn, Mt. Gelmir, and Fire Giant. Duel him in Farum Azula. Give his innards to Jar Bairn.", warning: "Do not kill him early." }
+        };
+
+        // --- 2. Vis.js Network Data Setup ---
+        const nodesData = new vis.DataSet([
+            // Main Progression
+            {id: 1, label: 'Start: Limgrave', group: 'main', level: 1},
+            {id: 5, label: 'TRIGGER: Altus Plateau', group: 'main', shape: 'hexagon', level: 4},
+            {id: 6, label: 'TRIGGER: Radahn Festival', group: 'main', shape: 'hexagon', level: 4},
+            {id: 8, label: 'Defeat Morgott', group: 'main', level: 6},
+            {id: 10, label: 'TRIGGER: Burn Erdtree', group: 'main', shape: 'hexagon', level: 7},
+            {id: 11, label: 'CRITICAL: Maliketh', group: 'main', shape: 'hexagon', color: {background: '#991b1b'}, level: 8},
+            
+            // Ranni & Magic
+            {id: 20, label: 'Meet Renna & Blaidd', group: 'ranni', level: 2},
+            {id: 21, label: 'Ranni\'s Rise', group: 'ranni', level: 3},
+            {id: 24, label: 'Fingerslayer Blade', group: 'ranni', level: 5},
+            {id: 27, label: 'Dark Moon Ring & Astel', group: 'ranni', level: 7},
+            {id: 110, label: 'Thops & Academy Key', group: 'magic', level: 3},
+            {id: 112, label: 'Sellen\'s Primal Glintstone', group: 'magic', level: 5},
+
+            // Fia & Rogier
+            {id: 30, label: 'Rogier\'s Investigation', group: 'fia', level: 2},
+            {id: 35, label: 'Give Cursemark to Fia', group: 'fia', level: 5},
+
+            // Order & Despair
+            {id: 40, label: 'Corhyn & Goldmask', group: 'order', level: 5},
+            {id: 42, label: 'Law of Regression', group: 'order', level: 6},
+            {id: 50, label: 'Free Dung Eater', group: 'dung', level: 6},
+
+            // Volcano Manor & Rya
+            {id: 60, label: 'Rya & Boggart (Necklace)', group: 'volcano', level: 3},
+            {id: 61, label: 'Join Volcano Manor', group: 'volcano', level: 5},
+            {id: 66, label: 'Defeat Rykard', group: 'volcano', level: 7},
+
+            // Millicent
+            {id: 71, label: 'Unalloyed Needle', group: 'millicent', level: 4},
+            {id: 75, label: 'Assist Millicent (Haligtree)', group: 'millicent', level: 9},
+
+            // Nepheli & Kenneth
+            {id: 80, label: 'Clear Fort Haight', group: 'nepheli', level: 2},
+            {id: 82, label: 'Stormhawk King', group: 'nepheli', level: 4},
+            {id: 83, label: 'Stormveil Throne Room', group: 'nepheli', level: 7},
+
+            // Frenzy
+            {id: 90, label: 'Hyetta & Grapes', group: 'frenzy', level: 3},
+            {id: 92, label: 'Three Fingers Door', group: 'frenzy', level: 7},
+
+            // Hunters
+            {id: 120, label: 'Varré & Maiden Blood', group: 'hunters', level: 4},
+            {id: 122, label: 'Yura vs Eleonora', group: 'hunters', level: 5},
+
+            // Companions
+            {id: 130, label: 'Boc (Gold Needle / Pate)', group: 'companions', level: 6},
+            {id: 132, label: 'Diallos & Jar Bairn', group: 'companions', level: 6},
+            {id: 134, label: 'Alexander\'s Duel', group: 'companions', level: 8}
+        ]);
+
+        const edgesData = new vis.DataSet([
+            // Main Flow
+            {from: 1, to: 5, color: '#334155'}, {from: 5, to: 6, color: '#334155'}, 
+            {from: 5, to: 8, color: '#334155'}, {from: 8, to: 10, color: '#334155'}, 
+            {from: 10, to: 11, color: '#334155'},
+
+            // Triggers & Lockouts (Red = Danger, Green = Unlock)
+            {from: 5, to: 40, dashes: true, label: 'Moves Corhyn'},
+            {from: 6, to: 24, label: 'Unlocks Nokron'},
+            {from: 6, to: 134, dashes: true, label: 'Moves Alexander'},
+            {from: 8, to: 83, label: 'Unlocks Throne'},
+            {from: 11, to: 42, dashes: true, color: '#ef4444', label: 'LOCKOUT'},
+            {from: 11, to: 61, dashes: true, color: '#ef4444', label: 'LOCKOUT'},
+            {from: 11, to: 83, dashes: true, color: '#ef4444', label: 'LOCKOUT'},
+            {from: 66, to: 61, dashes: true, color: '#ef4444', label: 'Fails Hit Quests'},
+            {from: 92, to: 11, dashes: true, color: '#ef4444', label: 'Locks Endings'},
+            {from: 75, to: 92, dashes: true, color: '#10b981', label: 'Needle Cures Lockout'},
+
+            // Story Flows
+            {from: 20, to: 21}, {from: 21, to: 24}, {from: 24, to: 27},
+            {from: 24, to: 112, dashes: true, label: 'Provides Cellar'},
+            {from: 30, to: 21, dashes: true, color: '#ef4444', label: 'Ranni Sleeps Rogier'},
+            {from: 24, to: 35, label: 'Cursemark'},
+            {from: 60, to: 50, dashes: true, label: 'Moves Boggart'},
+            {from: 60, to: 61}, {from: 61, to: 132, label: 'Diallos Leaves'}, {from: 134, to: 132, label: 'Give Innards'},
+            {from: 80, to: 82}, {from: 82, to: 83},
+            {from: 120, to: 6}, {from: 1, to: 122}
+        ]);
+
+        const container = document.getElementById('network-container');
+        const options = {
+            nodes: {
+                shape: 'box', borderWidth: 2,
+                font: { size: 14, color: '#f8fafc', background: 'rgba(15, 23, 42, 0.9)' },
+                margin: { top: 10, right: 15, bottom: 10, left: 15 },
+                shadow: { enabled: true, color: 'rgba(0,0,0,0.8)' }
+            },
+            edges: {
+                width: 2, arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+                smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
+                font: { size: 11, color: '#cbd5e1', align: 'top', background: '#0f172a', strokeWidth: 0 }
+            },
+            layout: { hierarchical: { direction: "UD", nodeSpacing: 250, levelSeparation: 180, sortMethod: "directed" } },
+            physics: { enabled: false }, // Hierarchical overrides physics
+            groups: {
+                main: { color: { background: '#f59e0b', border: '#b45309' } },
+                ranni: { color: { background: '#3b82f6', border: '#1d4ed8' } },
+                fia: { color: { background: '#a855f7', border: '#7e22ce' } },
+                volcano: { color: { background: '#ef4444', border: '#b91c1c' } },
+                millicent: { color: { background: '#14b8a6', border: '#0f766e' } },
+                nepheli: { color: { background: '#22c55e', border: '#15803d' } },
+                order: { color: { background: '#f97316', border: '#c2410c' } },
+                dung: { color: { background: '#84cc16', border: '#4d7c0f' } }, // Yellow-green
+                frenzy: { color: { background: '#fb923c', border: '#c2410c' } },
+                magic: { color: { background: '#0ea5e9', border: '#0369a1' } },
+                hunters: { color: { background: '#be123c', border: '#881337' } },
+                companions: { color: { background: '#64748b', border: '#334155' } }
+            },
+            interaction: { hover: true, zoomView: true, dragView: true }
+        };
+
+        const network = new vis.Network(container, { nodes: nodesData, edges: edgesData }, options);
+
+        // --- 3. Interaction Logic ---
+        network.on("click", function (params) {
+            const panel = document.getElementById('details-panel');
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const nodeInfo = questData[nodeId] || { title: "Minor Step", location: "Various", action: "Continue exploring.", warning: "None." };
+                
+                panel.innerHTML = `
+                    <div class="animate-fade-in">
+                        <h2 class="text-xl font-bold text-amber-500 mb-2">${nodeInfo.title}</h2>
+                        
+                        <div class="mb-4 inline-block bg-slate-700 rounded px-3 py-1 text-xs font-semibold text-slate-300">
+                            📍 ${nodeInfo.location}
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">What to do</h3>
+                            <p class="text-slate-200 leading-relaxed">${nodeInfo.action}</p>
+                        </div>
+
+                        ${nodeInfo.warning !== "None." ? `
+                        <div class="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r shadow-lg">
+                            <h3 class="text-sm font-bold text-red-400 uppercase tracking-wider mb-1 flex items-center">
+                                ⚠️ Lockout Warning
+                            </h3>
+                            <p class="text-red-200 text-sm leading-relaxed">${nodeInfo.warning}</p>
+                        </div>` : ''}
+                    </div>
+                `;
+            } else {
+                panel.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500 text-center italic">Select a node on the graph to view exact locations, Sites of Grace, and lockouts.</div>`;
+            }
+        });
+
+        // Dropdown Filter Logic
+        document.getElementById('quest-filter').addEventListener('change', function(e) {
+            const selectedGroup = e.target.value;
+            const updates = nodesData.get().map(node => {
+                if (selectedGroup === 'all' || node.group === selectedGroup || node.group === 'main') {
+                    return { id: node.id, color: undefined, font: { color: '#f8fafc' }, hidden: false };
+                } else {
+                    return { id: node.id, hidden: true }; // Actually hide irrelevant nodes in V3
+                }
+            });
+            nodesData.update(updates);
+            network.fit(); // Recenter camera
+        });
+    </script>
+</body>
+</html>
